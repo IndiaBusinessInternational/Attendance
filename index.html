@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>IBI Staff Attendance</title>
+    <style>
+        :root {
+            --bg: #f4f5f7;
+            --surface: #ffffff;
+            --text: #172b4d;
+            --border: #dfe1e6;
+            --in-btn: #10b981;
+            --in-btn-active: #059669;
+            --out-btn: #ef4444;
+            --out-btn-active: #dc2626;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --border: #334155;
+            --in-btn: #059669;
+            --in-btn-active: #047857;
+            --out-btn: #dc2626;
+            --out-btn-active: #b91c1c;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .theme-toggle {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .card {
+            background-color: var(--surface);
+            width: 100%;
+            max-width: 400px;
+            border-radius: 16px;
+            padding: 30px 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+
+        h2 { margin-top: 0; margin-bottom: 24px; }
+
+        .form-group { text-align: left; margin-bottom: 30px; }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+            opacity: 0.8;
+        }
+
+        select {
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            background-color: var(--bg);
+            color: var(--text);
+            font-weight: bold;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus { border-color: #3b82f6; }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        button.punch-btn {
+            width: 100%;
+            padding: 24px;
+            font-size: 22px;
+            font-weight: 800;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        button.punch-btn:active { transform: scale(0.96); }
+        button.punch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .btn-in { background-color: var(--in-btn); }
+        .btn-in:hover { background-color: var(--in-btn-active); }
+        
+        .btn-out { background-color: var(--out-btn); }
+        .btn-out:hover { background-color: var(--out-btn-active); }
+
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+        .status-success { background-color: #dcfce7; color: #166534; display: block !important; }
+        .status-error { background-color: #fee2e2; color: #991b1b; display: block !important; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h3 style="margin:0;">IBI Warehouse</h3>
+        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
+    </div>
+
+    <div class="card">
+        <h2>Staff Attendance</h2>
+
+        <div class="form-group">
+            <label for="staffName">Select Your Name</label>
+            <select id="staffName">
+                <option value="" disabled selected>-- Choose Name --</option>
+                <option value="S. Aswin">S. Aswin</option>
+                <option value="M. Ajay">M. Ajay</option>
+            </select>
+        </div>
+
+        <div class="btn-group">
+            <button class="punch-btn btn-in" id="inBtn" onclick="submitPunch('IN')">PUNCH IN 🟢</button>
+            <button class="punch-btn btn-out" id="outBtn" onclick="submitPunch('OUT')">PUNCH OUT 🔴</button>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        // --- Dark Mode Logic ---
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        if (currentTheme === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+            document.getElementById('themeBtn').innerText = '☀️ Light';
+        }
+
+        function toggleTheme() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.body.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                document.getElementById('themeBtn').innerText = '🌙 Dark';
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                document.getElementById('themeBtn').innerText = '☀️ Light';
+            }
+        }
+
+        // --- Punch Logic ---
+        // REPLACE WITH YOUR APPS SCRIPT URL
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbztj_cU2LtHlHztnFk9wP84pDe8BwLbtzfSoiZfVwT_d5cc4PDjM_qTV9m9LPUxfPbj6Q/exec';
+
+        function submitPunch(action) {
+            const staffName = document.getElementById('staffName').value;
+            const statusDiv = document.getElementById('status');
+            const inBtn = document.getElementById('inBtn');
+            const outBtn = document.getElementById('outBtn');
+
+            if (!staffName) {
+                alert("Please select your name first!");
+                return;
+            }
+
+            // UI Loading state
+            inBtn.disabled = true;
+            outBtn.disabled = true;
+            statusDiv.className = '';
+            statusDiv.innerText = 'Recording punch... please wait.';
+            statusDiv.style.display = 'block';
+
+            // Prepare Data
+            const formData = new FormData();
+            formData.append('staffName', staffName);
+            formData.append('action', action);
+
+            // Send to Google Sheets
+            fetch(scriptURL, { method: 'POST', body: formData })
+                .then(response => {
+                    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    statusDiv.innerText = `Success! ${action} recorded for ${staffName} at ${time}.`;
+                    statusDiv.className = 'status-success';
+                    
+                    // Reset UI
+                    inBtn.disabled = false;
+                    outBtn.disabled = false;
+                    document.getElementById('staffName').value = ""; // Force them to select name next time
+                    
+                    setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+                })
+                .catch(error => {
+                    statusDiv.innerText = 'Network error. Please try again.';
+                    statusDiv.className = 'status-error';
+                    inBtn.disabled = false;
+                    outBtn.disabled = false;
+                });
+        }
+    </script>
+
+</body>
+</html>
