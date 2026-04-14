@@ -297,7 +297,7 @@
                     const distance = calculateDistance(userLat, userLon, WAREHOUSE_LAT, WAREHOUSE_LON);
 
                     if (distance > MAX_DISTANCE_METERS) {
-                        // User is outside the geofence
+                        // User is outside the geofence (Displays exact distance on frontend)
                         statusDiv.innerText = `Punch Denied: You are ${Math.round(distance)} meters away from the warehouse.`;
                         statusDiv.className = 'status-error';
                         inBtn.disabled = false;
@@ -312,6 +312,7 @@
                     const formData = new FormData();
                     formData.append('staffName', staffName);
                     formData.append('action', action);
+                    // Distance is NOT appended to formData here.
 
                     fetch(scriptURL, { method: 'POST', body: formData })
                         .then(response => response.json())
