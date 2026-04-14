@@ -75,7 +75,6 @@
             transition: background-color 0.3s;
         }
 
-        /* Responsive CSS for the wide Logo */
         .company-logo {
             max-width: 100%; 
             height: auto;
@@ -132,7 +131,7 @@
         }
 
         button.punch-btn:active { transform: scale(0.96); }
-        button.punch-btn:disabled { cursor: not-allowed; }
+        button.punch-btn:disabled { cursor: not-allowed; opacity: 0.7; }
 
         .btn-in { background-color: var(--in-btn); }
         .btn-in:hover { background-color: var(--in-btn-active); }
@@ -149,6 +148,7 @@
         }
         .status-success { background-color: #dcfce7; color: #166534; display: block !important; }
         .status-error { background-color: #fee2e2; color: #991b1b; display: block !important; }
+        .status-warning { background-color: #fef08a; color: #854d0e; display: block !important; }
     </style>
 </head>
 <body>
@@ -159,7 +159,7 @@
     </div>
 
     <div class="card">
-        <img src="logo.png" alt="India Business International Logo" class="company-logo">
+        <img src="company-logo.png" alt="India Business International Logo" class="company-logo">
         
         <h2>Staff Attendance</h2>
 
@@ -181,6 +181,13 @@
     </div>
 
     <script>
+        // --- 🚨 SYSTEM CONFIGURATION 🚨 ---
+        // Exactly aligned to IBI Warehouse GPS Coordinates
+        const WAREHOUSE_LAT = 8.202612; 
+        const WAREHOUSE_LON = 77.240076; 
+        const MAX_DISTANCE_METERS = 50; 
+        // -----------------------------------
+
         const currentTheme = localStorage.getItem('theme') || 'light';
         if (currentTheme === 'dark') {
             document.body.setAttribute('data-theme', 'dark');
@@ -227,6 +234,22 @@
             }
         }
 
+        // Haversine formula to calculate distance between two GPS coordinates
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth's radius in meters
+            const radLat1 = lat1 * Math.PI / 180;
+            const radLat2 = lat2 * Math.PI / 180;
+            const deltaLat = (lat2 - lat1) * Math.PI / 180;
+            const deltaLon = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                      Math.cos(radLat1) * Math.cos(radLat2) *
+                      Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+            
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Returns distance in meters
+        }
+
         const scriptURL = 'https://script.google.com/macros/s/AKfycbztj_cU2LtHlHztnFk9wP84pDe8BwLbtzfSoiZfVwT_d5cc4PDjM_qTV9m9LPUxfPbj6Q/exec';
 
         function submitPunch(action) {
@@ -253,41 +276,86 @@
 
             inBtn.disabled = true;
             outBtn.disabled = true;
-            statusDiv.className = '';
-            statusDiv.innerText = 'Recording punch... please wait.';
-            statusDiv.style.display = 'block';
+            statusDiv.className = 'status-warning';
+            statusDiv.innerText = 'Acquiring GPS Signal... Please wait.';
 
-            const formData = new FormData();
-            formData.append('staffName', staffName);
-            formData.append('action', action);
+            // Check if Geolocation is supported
+            if (!navigator.geolocation) {
+                statusDiv.innerText = 'Error: GPS is not supported on this device/browser.';
+                statusDiv.className = 'status-error';
+                inBtn.disabled = false;
+                outBtn.disabled = false;
+                return;
+            }
 
-            fetch(scriptURL, { method: 'POST', body: formData })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        statusDiv.innerText = `Success! ${action} recorded for ${staffName} at ${time}.`;
-                        statusDiv.className = 'status-success';
-                        speakThankYou();
-                        localStorage.setItem('ibi_punch_' + staffName, action);
-                    } else {
-                        statusDiv.innerText = `Google Error: ${data.message}`;
+            // Request Location
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+                    
+                    const distance = calculateDistance(userLat, userLon, WAREHOUSE_LAT, WAREHOUSE_LON);
+
+                    if (distance > MAX_DISTANCE_METERS) {
+                        // User is outside the geofence
+                        statusDiv.innerText = `Punch Denied: You are ${Math.round(distance)} meters away from the warehouse.`;
                         statusDiv.className = 'status-error';
+                        inBtn.disabled = false;
+                        outBtn.disabled = false;
+                        return;
                     }
+
+                    // User is inside the geofence -> Proceed with saving data
+                    statusDiv.className = 'status-warning';
+                    statusDiv.innerText = 'Location Verified. Recording punch...';
+
+                    const formData = new FormData();
+                    formData.append('staffName', staffName);
+                    formData.append('action', action);
+
+                    fetch(scriptURL, { method: 'POST', body: formData })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                statusDiv.innerText = `Success! ${action} recorded for ${staffName} at ${time}.`;
+                                statusDiv.className = 'status-success';
+                                speakThankYou();
+                                localStorage.setItem('ibi_punch_' + staffName, action);
+                            } else {
+                                statusDiv.innerText = `Google Error: ${data.message}`;
+                                statusDiv.className = 'status-error';
+                            }
+                            
+                            inBtn.disabled = false;
+                            outBtn.disabled = false;
+                            document.getElementById('staffName').value = ""; 
+                            checkStaffState(); 
+                            
+                            setTimeout(() => { statusDiv.style.display = 'none'; }, 8000);
+                        })
+                        .catch(error => {
+                            statusDiv.innerText = 'Network error. Please try again.';
+                            statusDiv.className = 'status-error';
+                            inBtn.disabled = false;
+                            outBtn.disabled = false;
+                        });
+
+                },
+                function(error) {
+                    // Handle GPS errors (e.g., User clicked "Deny")
+                    let errorMsg = 'Unknown Location Error.';
+                    if (error.code === 1) errorMsg = 'Punch Denied: You must Allow Location access.';
+                    if (error.code === 2) errorMsg = 'Punch Denied: GPS signal lost.';
+                    if (error.code === 3) errorMsg = 'Punch Denied: Location request timed out.';
                     
-                    inBtn.disabled = false;
-                    outBtn.disabled = false;
-                    document.getElementById('staffName').value = ""; 
-                    checkStaffState(); 
-                    
-                    setTimeout(() => { statusDiv.style.display = 'none'; }, 8000);
-                })
-                .catch(error => {
-                    statusDiv.innerText = 'Network error. Please try again.';
+                    statusDiv.innerText = errorMsg;
                     statusDiv.className = 'status-error';
                     inBtn.disabled = false;
                     outBtn.disabled = false;
-                });
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // Force high accuracy GPS
+            );
         }
     </script>
 
