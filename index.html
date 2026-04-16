@@ -210,7 +210,7 @@
 
         <div id="status"></div>
 
-        <div class="reset-link" onclick="resetDeviceState()">🔄 Reset Device State</div>
+        <div class="reset-link" onclick="forceSyncState()">🔄 App out of sync? Fix it here.</div>
     </div>
 
     <script>
@@ -269,16 +269,26 @@
             }
         }
 
-        function resetDeviceState() {
+        // --- NEW ANTI-DOUBLE PUNCH SYNC LOGIC ---
+        function forceSyncState() {
             const staffName = document.getElementById('staffName').value;
             if(!staffName) {
-                alert("Please select your profile first to reset.");
+                alert("Please select your profile first.");
                 return;
             }
-            localStorage.removeItem('ibi_punch_' + staffName);
-            checkStaffState();
-            alert(`Device state reset for ${staffName}. Both buttons are now active.`);
+            
+            // Forces the user to declare their true state to lock the opposite button
+            let userResponse = prompt(`Is ${staffName} currently punched IN or OUT on the master Google Sheet?\n\nPlease type exactly: IN or OUT`).toUpperCase();
+            
+            if (userResponse === 'IN' || userResponse === 'OUT') {
+                localStorage.setItem('ibi_punch_' + staffName, userResponse);
+                checkStaffState();
+                alert(`Sync Successful! Your app now knows you are marked ${userResponse}. The correct button is now active.`);
+            } else {
+                alert("Sync Cancelled. You must type exactly IN or OUT.");
+            }
         }
+        // ----------------------------------------
 
         function speakThankYou() {
             if ('speechSynthesis' in window) {
@@ -303,7 +313,6 @@
             return R * c; 
         }
 
-        // Live GPS Tracking (Visual Only)
         function startLiveGPS() {
             const gpsText = document.getElementById('gpsText');
             
@@ -348,7 +357,6 @@
             startLiveGPS();
         };
 
-        // Standard Manual Punch
         function submitPunch(action) {
             const staffName = document.getElementById('staffName').value;
             const statusDiv = document.getElementById('status');
