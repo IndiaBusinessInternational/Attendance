@@ -218,7 +218,6 @@
         const WAREHOUSE_LAT = 8.202612; 
         const WAREHOUSE_LON = 77.240076; 
         const MAX_DISTANCE_METERS = 50; 
-        let autoPunchLock = false; // Prevents overlapping requests
         const scriptURL = 'https://script.google.com/macros/s/AKfycbztj_cU2LtHlHztnFk9wP84pDe8BwLbtzfSoiZfVwT_d5cc4PDjM_qTV9m9LPUxfPbj6Q/exec';
         // -----------------------------------
 
@@ -241,7 +240,6 @@
             }
         }
 
-        // Saves profile so they don't have to pick it every time
         function handleProfileSelection() {
             const staffName = document.getElementById('staffName').value;
             localStorage.setItem('ibi_saved_profile', staffName);
@@ -282,9 +280,9 @@
             alert(`Device state reset for ${staffName}. Both buttons are now active.`);
         }
 
-        function speakMessage(text) {
+        function speakThankYou() {
             if ('speechSynthesis' in window) {
-                const msg = new SpeechSynthesisUtterance(text);
+                const msg = new SpeechSynthesisUtterance("Thank You, from India Business International");
                 msg.rate = 0.9; 
                 window.speechSynthesis.speak(msg);
             }
@@ -305,47 +303,7 @@
             return R * c; 
         }
 
-        // Universal Auto-Punch Function
-        function triggerAutoPunch(staffName, action) {
-            autoPunchLock = true; 
-            
-            if (action === 'IN') {
-                speakMessage("Welcome to the warehouse. Automatically punched IN.");
-            } else if (action === 'OUT') {
-                speakMessage("You forgot to punch OUT button, and I am automatically helping you to Punch OUT");
-            }
-
-            const statusDiv = document.getElementById('status');
-            statusDiv.className = 'status-warning';
-            statusDiv.innerText = `Auto-Detecting Location... Punching ${action} for ${staffName}...`;
-            statusDiv.style.display = 'block';
-
-            const formData = new FormData();
-            formData.append('staffName', staffName);
-            formData.append('action', action);
-
-            fetch(scriptURL, { method: 'POST', body: formData })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        localStorage.setItem('ibi_punch_' + staffName, action);
-                        statusDiv.innerText = `Success! Auto PUNCH ${action} recorded.`;
-                        statusDiv.className = 'status-success';
-                        checkStaffState(); 
-                        setTimeout(() => { 
-                            statusDiv.style.display = 'none'; 
-                            autoPunchLock = false; // Release lock
-                        }, 8000);
-                    }
-                })
-                .catch(error => {
-                    statusDiv.innerText = `Auto-Punch ${action} failed due to Network error. Please click manually.`;
-                    statusDiv.className = 'status-error';
-                    autoPunchLock = false; // Release lock
-                });
-        }
-
-        // Live GPS Tracking & Auto-Punch Evaluator
+        // Live GPS Tracking (Visual Only)
         function startLiveGPS() {
             const gpsText = document.getElementById('gpsText');
             
@@ -360,33 +318,13 @@
                     const userLat = position.coords.latitude;
                     const userLon = position.coords.longitude;
                     const distance = Math.round(calculateDistance(userLat, userLon, WAREHOUSE_LAT, WAREHOUSE_LON));
-                    const staffName = document.getElementById('staffName').value;
 
                     if (distance <= MAX_DISTANCE_METERS) {
                         gpsText.innerHTML = `On-Site Verified: ${distance}m away 🟢`;
                         gpsText.style.color = "#10b981"; 
-
-                        // AUTO PUNCH IN LOGIC
-                        if (staffName && !autoPunchLock) {
-                            const lastPunch = localStorage.getItem('ibi_punch_' + staffName);
-                            // If they are at the warehouse and currently OUT (or never punched), trigger IN
-                            if (lastPunch !== 'IN') {
-                                triggerAutoPunch(staffName, 'IN');
-                            }
-                        }
-
                     } else {
                         gpsText.innerHTML = `Outside Zone: ${distance}m away 🔴`;
                         gpsText.style.color = "#ef4444"; 
-
-                        // AUTO PUNCH OUT LOGIC
-                        if (staffName && !autoPunchLock) {
-                            const lastPunch = localStorage.getItem('ibi_punch_' + staffName);
-                            // If they are away from warehouse and currently IN, trigger OUT
-                            if (lastPunch === 'IN') {
-                                triggerAutoPunch(staffName, 'OUT');
-                            }
-                        }
                     }
                 },
                 function(error) {
@@ -401,9 +339,7 @@
             );
         }
 
-        // Initialize App on Load
         window.onload = function() {
-            // Load saved profile if it exists
             const savedProfile = localStorage.getItem('ibi_saved_profile');
             if (savedProfile) {
                 document.getElementById('staffName').value = savedProfile;
@@ -412,12 +348,28 @@
             startLiveGPS();
         };
 
-        // Standard Manual Punch (Backup if they want to click it manually)
+        // Standard Manual Punch
         function submitPunch(action) {
             const staffName = document.getElementById('staffName').value;
             const statusDiv = document.getElementById('status');
             const inBtn = document.getElementById('inBtn');
             const outBtn = document.getElementById('outBtn');
+
+            if (!staffName) {
+                alert("Please select your name first!");
+                return;
+            }
+
+            const lastPunch = localStorage.getItem('ibi_punch_' + staffName);
+            
+            if (action === 'IN' && lastPunch === 'IN') {
+                alert("Wait! You are already punched IN. Please press PUNCH OUT.");
+                return;
+            }
+            if (action === 'OUT' && lastPunch === 'OUT') {
+                alert("Wait! You are already punched OUT. Please press PUNCH IN.");
+                return;
+            }
 
             inBtn.disabled = true;
             outBtn.disabled = true;
@@ -452,7 +404,7 @@
                                 const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                                 statusDiv.innerText = `Success! ${action} recorded for ${staffName} at ${time}.`;
                                 statusDiv.className = 'status-success';
-                                speakMessage("Thank You, from India Business International");
+                                speakThankYou();
                                 localStorage.setItem('ibi_punch_' + staffName, action);
                             } else {
                                 statusDiv.innerText = `Google Error: ${data.message}`;
